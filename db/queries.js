@@ -1,397 +1,240 @@
-// db/queries.js
-//
+// seed.js
 // =============================================================================
-//  THIS IS THE FILE YOU EDIT.
-// =============================================================================
-//
-// All 15 query functions you need to implement live in this file. Every
-// function has:
-//
-//   • A description of what it should do
-//   • The exact parameters and return shape expected by the routes
-//   • A hint about which Mongo operator/method fits
-//   • A // TODO marker where you write your code
-//
-// Do NOT change function names, parameter order, or return shapes —
-// the routes call these functions exactly as defined here. If you change
-// the contract, the frontend will break.
-//
-// All functions receive `db` (the connected MongoDB Db instance) as the first
-// argument. Use `db.collection("users")`, `db.collection("projects")`, etc.
-//
-// MUST USE: native `mongodb` driver only. No Mongoose, no ODM.
+//  Seed the database with realistic test data.
+//  Run with: npm run seed
 // =============================================================================
 
-const { ObjectId } = require('mongodb');
+require('dotenv').config();
+const bcrypt = require('bcryptjs');
+const { connect } = require('./db/connection');
 
-/**
- * Query 1: signupUser
- * -------------------------------------------------------------
- * Insert a new user document. Email must be globally unique
- * (a duplicate email should be rejected by the database).
- *
- * @param {Db} db
- * @param {{ email: string, passwordHash: string, name: string }} userData
- * @returns {Promise<{ insertedId: ObjectId }>}
- *
- * Expected behaviour:
- *   - If email is unique → returns { insertedId: <new ObjectId> }
- *   - If email already exists → MongoDB throws a duplicate-key error
- *     (the route catches this and shows "email taken")
- *
- * The document you insert should also include `createdAt: new Date()`.
- *
- * Hint: insertOne. Nothing fancy.
- */
-async function signupUser(db, userData) {
-  // TODO: implement
-  throw new Error('signupUser not implemented');
-}
+(async () => {
+  const db = await connect();
 
-/**
- * Query 2: loginFindUser
- * -------------------------------------------------------------
- * Find a user by email so the route can compare passwords.
- *
- * @param {Db} db
- * @param {string} email
- * @returns {Promise<Object|null>}
- *
- * Expected output shape:
- *   { _id: ObjectId, email: "...", passwordHash: "...", name: "...", createdAt: Date }
- *   or null if no user with that email exists.
- *
- * Hint: findOne with an exact-match filter.
- */
-async function loginFindUser(db, email) {
-  // TODO: implement
-  throw new Error('loginFindUser not implemented');
-}
+  await db.collection('users').createIndex({ email: 1 }, { unique: true });
 
-/**
- * Query 3: listUserProjects
- * -------------------------------------------------------------
- * List all NON-archived projects belonging to one user, newest first.
- *
- * @param {Db} db
- * @param {ObjectId} ownerId
- * @returns {Promise<Array<Object>>}
- *
- * Expected output: array of project documents, each shaped like:
- *   { _id, ownerId, name, archived: false, createdAt, ... }
- *   sorted by createdAt descending.
- *
- * Hint: find with two filter conditions, then .sort().toArray().
- */
-async function listUserProjects(db, ownerId) {
-  // TODO: implement
-  throw new Error('listUserProjects not implemented');
-}
+  await db.collection('notes').deleteMany({});
+  await db.collection('tasks').deleteMany({});
+  await db.collection('projects').deleteMany({});
+  await db.collection('users').deleteMany({});
 
-/**
- * Query 4: createProject
- * -------------------------------------------------------------
- * Insert a new project for a user.
- *
- * @param {Db} db
- * @param {{ ownerId: ObjectId, name: string, description?: string }} projectData
- * @returns {Promise<{ insertedId: ObjectId }>}
- *
- * The document should default `archived: false` and set `createdAt: new Date()`.
- *
- * Hint: insertOne again — just remember to add the defaults yourself.
- */
-async function createProject(db, projectData) {
-  // TODO: implement
-  throw new Error('createProject not implemented');
-}
+  const [amiraHash, bilalHash] = await Promise.all([
+    bcrypt.hash('password123', 10),
+    bcrypt.hash('studyhard456', 10)
+  ]);
 
-/**
- * Query 5: archiveProject
- * -------------------------------------------------------------
- * Mark a project as archived (do not delete).
- *
- * @param {Db} db
- * @param {ObjectId} projectId
- * @returns {Promise<{ matchedCount: number, modifiedCount: number }>}
- *
- * Expected behaviour:
- *   - matched and modified should both be 1 on success
- *   - matched=0 if projectId doesn't exist
- *
- * Hint: updateOne with the $set operator.
- */
-async function archiveProject(db, projectId) {
-  // TODO: implement
-  throw new Error('archiveProject not implemented');
-}
+  const usersResult = await db.collection('users').insertMany([
+    {
+      email: 'amira@example.com',
+      passwordHash: amiraHash,
+      name: 'Amira Khan',
+      createdAt: new Date('2026-04-01T09:00:00Z')
+    },
+    {
+      email: 'bilal@example.com',
+      passwordHash: bilalHash,
+      name: 'Bilal Ahmed',
+      createdAt: new Date('2026-04-02T10:30:00Z')
+    }
+  ]);
 
-/**
- * Query 6: listProjectTasks
- * -------------------------------------------------------------
- * List tasks for one project, with an optional status filter,
- * sorted by priority descending then createdAt descending.
- *
- * @param {Db} db
- * @param {ObjectId} projectId
- * @param {string} [status]  — optional. One of "todo" | "in-progress" | "done".
- *                             If omitted, return tasks of ALL statuses.
- * @returns {Promise<Array<Object>>}
- *
- * Expected output: array of task documents.
- *
- * Hint: build the filter object dynamically. Only add the `status` key when
- *       the caller passed one. Then chain .sort({ priority: -1, createdAt: -1 }).
- */
-async function listProjectTasks(db, projectId, status) {
-  // TODO: implement
-  throw new Error('listProjectTasks not implemented');
-}
+  const amiraId = usersResult.insertedIds['0'];
+  const bilalId = usersResult.insertedIds['1'];
 
-/**
- * Query 7: createTask
- * -------------------------------------------------------------
- * Insert a new task. Tasks have embedded subtasks and a tags array.
- *
- * @param {Db} db
- * @param {{
- *   ownerId: ObjectId,
- *   projectId: ObjectId,
- *   title: string,
- *   priority?: number,         // default 1
- *   tags?: string[],           // default []
- *   subtasks?: Array<{title: string, done: boolean}>  // default []
- * }} taskData
- * @returns {Promise<{ insertedId: ObjectId }>}
- *
- * The inserted document should also include `status: "todo"` and
- * `createdAt: new Date()`.
- *
- * Hint: insertOne. Apply defaults for any missing optional fields.
- */
-async function createTask(db, taskData) {
-  // TODO: implement
-  throw new Error('createTask not implemented');
-}
+  const projectsResult = await db.collection('projects').insertMany([
+    {
+      ownerId: amiraId,
+      name: 'Final Year Project',
+      description: 'Build the database and dashboard for the capstone app.',
+      archived: false,
+      createdAt: new Date('2026-04-03T08:00:00Z')
+    },
+    {
+      ownerId: amiraId,
+      name: 'Exam Prep',
+      description: 'Track revision topics and practice sessions.',
+      archived: false,
+      createdAt: new Date('2026-04-04T11:15:00Z')
+    },
+    {
+      ownerId: bilalId,
+      name: 'Freelance Website',
+      description: 'Client redesign with a content handoff checklist.',
+      archived: false,
+      createdAt: new Date('2026-04-05T13:45:00Z')
+    },
+    {
+      ownerId: bilalId,
+      name: 'Personal Admin',
+      description: 'Bills, errands, and life logistics.',
+      archived: true,
+      createdAt: new Date('2026-04-06T07:20:00Z')
+    }
+  ]);
 
-/**
- * Query 8: updateTaskStatus
- * -------------------------------------------------------------
- * Change a task's status field.
- *
- * @param {Db} db
- * @param {ObjectId} taskId
- * @param {string} newStatus  — "todo" | "in-progress" | "done"
- * @returns {Promise<{ matchedCount: number, modifiedCount: number }>}
- *
- * Hint: updateOne + $set.
- */
-async function updateTaskStatus(db, taskId, newStatus) {
-  // TODO: implement
-  throw new Error('updateTaskStatus not implemented');
-}
+  const finalYearProjectId = projectsResult.insertedIds['0'];
+  const examPrepId = projectsResult.insertedIds['1'];
+  const freelanceWebsiteId = projectsResult.insertedIds['2'];
+  const personalAdminId = projectsResult.insertedIds['3'];
 
-/**
- * Query 9: addTaskTag
- * -------------------------------------------------------------
- * Append a tag to a task's tags array, BUT only if it isn't already present.
- *
- * @param {Db} db
- * @param {ObjectId} taskId
- * @param {string} tag
- * @returns {Promise<{ matchedCount: number, modifiedCount: number }>}
- *
- * Expected behaviour:
- *   - If tag is new → modifiedCount = 1, tags array gains the new entry
- *   - If tag is already present → modifiedCount = 0 (no duplicate added)
- *
- * Hint: which array operator silently skips duplicates? It is NOT $push.
- */
-async function addTaskTag(db, taskId, tag) {
-  // TODO: implement
-  throw new Error('addTaskTag not implemented');
-}
+  await db.collection('tasks').insertMany([
+    {
+      ownerId: amiraId,
+      projectId: finalYearProjectId,
+      title: 'Design MongoDB collections',
+      status: 'in-progress',
+      priority: 5,
+      tags: ['database', 'backend', 'urgent'],
+      subtasks: [
+        { title: 'List entities', done: true },
+        { title: 'Choose embed vs reference', done: true },
+        { title: 'Draft schema notes', done: false }
+      ],
+      dueDate: new Date('2026-04-28T12:00:00Z'),
+      createdAt: new Date('2026-04-10T09:00:00Z')
+    },
+    {
+      ownerId: amiraId,
+      projectId: finalYearProjectId,
+      title: 'Implement dashboard aggregations',
+      status: 'todo',
+      priority: 4,
+      tags: ['mongodb', 'aggregation'],
+      subtasks: [
+        { title: 'Count tasks by status', done: false },
+        { title: 'Join project names', done: false }
+      ],
+      createdAt: new Date('2026-04-12T14:30:00Z')
+    },
+    {
+      ownerId: amiraId,
+      projectId: finalYearProjectId,
+      title: 'Prepare demo screenshots',
+      status: 'done',
+      priority: 2,
+      tags: ['submission', 'screenshots'],
+      subtasks: [
+        { title: 'Open dashboard', done: true },
+        { title: 'Capture aggregation result', done: true }
+      ],
+      createdAt: new Date('2026-04-15T16:00:00Z')
+    },
+    {
+      ownerId: amiraId,
+      projectId: examPrepId,
+      title: 'Revise transaction schedules',
+      status: 'todo',
+      priority: 3,
+      tags: ['dbms', 'revision'],
+      subtasks: [
+        { title: 'Read lecture slides', done: false },
+        { title: 'Solve past paper question', done: false }
+      ],
+      createdAt: new Date('2026-04-11T07:45:00Z')
+    },
+    {
+      ownerId: amiraId,
+      projectId: examPrepId,
+      title: 'Practice aggregation pipelines',
+      status: 'in-progress',
+      priority: 4,
+      tags: ['mongodb', 'practice'],
+      subtasks: [
+        { title: 'Match and group examples', done: true },
+        { title: 'Lookup and unwind examples', done: false }
+      ],
+      dueDate: new Date('2026-04-30T18:00:00Z'),
+      createdAt: new Date('2026-04-18T10:20:00Z')
+    },
+    {
+      ownerId: bilalId,
+      projectId: freelanceWebsiteId,
+      title: 'Collect homepage copy',
+      status: 'done',
+      priority: 2,
+      tags: ['content', 'client'],
+      subtasks: [
+        { title: 'Request final headline', done: true },
+        { title: 'Approve service blurbs', done: true }
+      ],
+      createdAt: new Date('2026-04-09T12:00:00Z')
+    },
+    {
+      ownerId: bilalId,
+      projectId: freelanceWebsiteId,
+      title: 'Optimize image delivery',
+      status: 'in-progress',
+      priority: 4,
+      tags: ['frontend', 'performance'],
+      subtasks: [
+        { title: 'Compress hero assets', done: true },
+        { title: 'Test lazy loading', done: false }
+      ],
+      createdAt: new Date('2026-04-17T09:40:00Z')
+    },
+    {
+      ownerId: bilalId,
+      projectId: personalAdminId,
+      title: 'Pay electricity bill',
+      status: 'todo',
+      priority: 5,
+      tags: ['finance', 'home'],
+      subtasks: [
+        { title: 'Check due amount', done: false }
+      ],
+      createdAt: new Date('2026-04-08T06:30:00Z')
+    }
+  ]);
 
-/**
- * Query 10: removeTaskTag
- * -------------------------------------------------------------
- * Remove a tag from a task's tags array.
- *
- * @param {Db} db
- * @param {ObjectId} taskId
- * @param {string} tag
- * @returns {Promise<{ matchedCount: number, modifiedCount: number }>}
- *
- * Expected behaviour:
- *   - If tag was present → modifiedCount = 1
- *   - If tag wasn't present → modifiedCount = 0
- *
- * Hint: $pull.
- */
-async function removeTaskTag(db, taskId, tag) {
-  // TODO: implement
-  throw new Error('removeTaskTag not implemented');
-}
+  await db.collection('notes').insertMany([
+    {
+      ownerId: amiraId,
+      projectId: finalYearProjectId,
+      title: 'Schema idea',
+      body: 'Keep subtasks embedded in tasks because they are always displayed and updated with the parent task.',
+      tags: ['database', 'design'],
+      createdAt: new Date('2026-04-10T10:00:00Z')
+    },
+    {
+      ownerId: amiraId,
+      projectId: examPrepId,
+      title: 'Revision reminder',
+      body: 'Focus on $lookup, $unwind, and $group examples before the quiz.',
+      tags: ['revision', 'mongodb'],
+      createdAt: new Date('2026-04-18T11:00:00Z')
+    },
+    {
+      ownerId: amiraId,
+      title: 'General productivity',
+      body: 'Batch similar tasks together in the evening to reduce context switching.',
+      tags: ['ideas', 'habits'],
+      createdAt: new Date('2026-04-19T19:15:00Z')
+    },
+    {
+      ownerId: bilalId,
+      projectId: freelanceWebsiteId,
+      title: 'Client call notes',
+      body: 'Client prefers lighter colors and wants the contact section above the footer.',
+      tags: ['client', 'design'],
+      createdAt: new Date('2026-04-16T15:30:00Z')
+    },
+    {
+      ownerId: bilalId,
+      title: 'Weekend errands',
+      body: 'Pick up printouts, renew library card, and buy stationery.',
+      tags: ['home', 'errands'],
+      createdAt: new Date('2026-04-20T08:45:00Z')
+    },
+    {
+      ownerId: bilalId,
+      projectId: personalAdminId,
+      title: 'Budget idea',
+      body: 'Track monthly recurring bills in one sheet and archive paid receipts.',
+      tags: ['finance', 'planning'],
+      createdAt: new Date('2026-04-21T13:10:00Z')
+    }
+  ]);
 
-/**
- * Query 11: toggleSubtask
- * -------------------------------------------------------------
- * Inside a task's `subtasks` array, find the subtask whose title
- * matches `subtaskTitle` and flip its `done` field to `newDone`.
- *
- * @param {Db} db
- * @param {ObjectId} taskId
- * @param {string} subtaskTitle
- * @param {boolean} newDone
- * @returns {Promise<{ matchedCount: number, modifiedCount: number }>}
- *
- * Example: a task has subtasks: [
- *   { title: "Draft outline", done: false },
- *   { title: "Write intro",  done: false }
- * ]
- * Calling toggleSubtask(db, taskId, "Write intro", true) should produce:
- *   [
- *     { title: "Draft outline", done: false },
- *     { title: "Write intro",  done: true  }
- *   ]
- *
- * Hint: this is the POSITIONAL OPERATOR scenario. Your filter must
- *       reference the subtask by title (so Mongo knows which array element
- *       matched), and your $set path uses `subtasks.$.done`.
- */
-async function toggleSubtask(db, taskId, subtaskTitle, newDone) {
-  // TODO: implement
-  throw new Error('toggleSubtask not implemented');
-}
-
-/**
- * Query 12: deleteTask
- * -------------------------------------------------------------
- * Permanently delete a task.
- *
- * @param {Db} db
- * @param {ObjectId} taskId
- * @returns {Promise<{ deletedCount: number }>}
- *
- * Hint: deleteOne.
- */
-async function deleteTask(db, taskId) {
-  // TODO: implement
-  throw new Error('deleteTask not implemented');
-}
-
-/**
- * Query 13: searchNotes
- * -------------------------------------------------------------
- * Find notes belonging to a user that match ANY of the given tags.
- * Optionally restrict to one project.
- *
- * @param {Db} db
- * @param {ObjectId} ownerId
- * @param {string[]} tags        — match notes whose tags array contains
- *                                 at least one of these
- * @param {ObjectId} [projectId] — optional. If given, restrict to this project.
- * @returns {Promise<Array<Object>>}
- *
- * Expected output: array of note documents matching the filter,
- *                  sorted by createdAt descending.
- *
- * Hint: the operator that says "field's value is one of these" is $in.
- *       Build the filter conditionally based on whether projectId was passed.
- */
-async function searchNotes(db, ownerId, tags, projectId) {
-  // TODO: implement
-  throw new Error('searchNotes not implemented');
-}
-
-/**
- * Query 14: projectTaskSummary
- * -------------------------------------------------------------
- * For one user, return per-project counts of tasks grouped by status,
- * with the project name attached. THIS IS THE NoSQL "JOIN".
- *
- * @param {Db} db
- * @param {ObjectId} ownerId
- * @returns {Promise<Array<Object>>}
- *
- * Expected output shape — one document per project:
- *   {
- *     _id: ObjectId,             // the projectId
- *     projectName: "Final Year Project",
- *     todo: 3,
- *     inProgress: 2,
- *     done: 5,
- *     total: 10
- *   }
- *
- * Pipeline outline:
- *   1. $match    — only this user's tasks
- *   2. $group    — group by projectId; use $sum with $cond to count per status
- *                  e.g. todo: { $sum: { $cond: [{ $eq: ["$status", "todo"] }, 1, 0] } }
- *   3. $lookup   — join "projects" collection to get the name. Use:
- *                    from: "projects", localField: "_id",
- *                    foreignField: "_id", as: "project"
- *   4. $unwind   — flatten the joined "project" array (it has at most 1 element)
- *   5. $project  — reshape into the expected output above
- *
- * Hint: $lookup returns an ARRAY (because joins can match many).
- *       $unwind turns a 1-element array into the element itself.
- */
-async function projectTaskSummary(db, ownerId) {
-  // TODO: implement
-  throw new Error('projectTaskSummary not implemented');
-}
-
-/**
- * Query 15: recentActivityFeed
- * -------------------------------------------------------------
- * The 10 most recently created tasks across all of a user's projects,
- * each one annotated with its project's name. ALSO uses $lookup.
- *
- * @param {Db} db
- * @param {ObjectId} ownerId
- * @returns {Promise<Array<Object>>}
- *
- * Expected output — 10 task documents (or fewer if user has < 10), each shaped:
- *   {
- *     _id, title, status, priority, createdAt,
- *     projectId,
- *     projectName: "..."   // joined in
- *   }
- *
- * Pipeline outline:
- *   1. $match    — only this user's tasks
- *   2. $sort     — newest first
- *   3. $limit    — 10
- *   4. $lookup   — join "projects" to get the name
- *   5. $unwind   — flatten the joined array
- *   6. $project  — keep the fields above (drop the rest)
- *
- * Hint: putting $sort and $limit BEFORE $lookup is intentional —
- *       you only want to look up 10 projects, not all of them.
- */
-async function recentActivityFeed(db, ownerId) {
-  // TODO: implement
-  throw new Error('recentActivityFeed not implemented');
-}
-
-// =============================================================================
-//  EXPORTS — do not edit
-// =============================================================================
-module.exports = {
-  signupUser,
-  loginFindUser,
-  listUserProjects,
-  createProject,
-  archiveProject,
-  listProjectTasks,
-  createTask,
-  updateTaskStatus,
-  addTaskTag,
-  removeTaskTag,
-  toggleSubtask,
-  deleteTask,
-  searchNotes,
-  projectTaskSummary,
-  recentActivityFeed
-};
+  console.log('Seed data inserted successfully.');
+  process.exit(0);
+})();
